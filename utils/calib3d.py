@@ -146,6 +146,19 @@ class ReprojRegressor(LinearRegression):
     def predict(self, points3d):
         return proj_3dto2d(self.coef_, points3d)
 
+def pose2params(K, R, T):
+    R, _ = cv2.Rodrigues(R)
+    R = R.squeeze()
+    T = T.squeeze()
+    return np.array([K[0,0], K[1,1], K[0,2], K[1,2], R[0], R[1], R[2], T[0], T[1], T[2]])
+
+def params2pose(initial_params):
+    fx, fy, cx, cy, rx, ry, rz, tx, ty, tz = initial_params
+    R = np.array([[rx], [ry], [rz]])
+    R, _ = cv2.Rodrigues(R)
+    T = np.array([[tx], [ty], [tz]])
+    K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
+    return K, R, T
 
 def DLS_pose_est(points3d, points2d, initial_params=np.array([1000, 1000, 500, 500, 0, 0, 0, 0, 0, 0]), threshold=None,
                  useRANSAC=True, max_trials=25,
@@ -158,7 +171,7 @@ def DLS_pose_est(points3d, points2d, initial_params=np.array([1000, 1000, 500, 5
     '''
     if useRANSAC:
         reg = RANSACRegressor(base_estimator=ReprojRegressor(initial_params, bounds, verbose=1, method='lm'),
-                              min_samples=max(np.ceil(len(points2d) * 0.01), 12),
+                              min_samples=max(np.ceil(len(points2d) * 0.01), 20),
                               loss=euclidean_err, residual_threshold=threshold,
                               is_model_valid=ReprojRegressor.is_model_valid, random_state=0, max_trials=max_trials)
         reg = reg.fit(points3d, points2d)
